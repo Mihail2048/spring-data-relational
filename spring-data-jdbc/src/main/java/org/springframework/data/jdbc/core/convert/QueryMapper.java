@@ -34,9 +34,10 @@ import org.springframework.data.mapping.context.InvalidPersistentPropertyPath;
 import org.springframework.data.mapping.context.MappingContext;
 import org.springframework.data.relational.core.mapping.RelationalPersistentEntity;
 import org.springframework.data.relational.core.mapping.RelationalPersistentProperty;
+import org.springframework.data.relational.core.query.Comparator;
 import org.springframework.data.relational.core.query.CriteriaDefinition;
-import org.springframework.data.relational.core.query.CriteriaDefinition.Comparator;
 import org.springframework.data.relational.core.query.ValueFunction;
+import org.springframework.data.relational.core.query.Comparators;
 import org.springframework.data.relational.core.sql.*;
 import org.springframework.data.relational.domain.SqlSort;
 import org.springframework.data.util.Pair;
@@ -53,6 +54,7 @@ import org.springframework.util.ClassUtils;
  * @author Mark Paluch
  * @author Jens Schauder
  * @author Yan Qiang
+ * @author Mikhail Polivakha
  * @since 3.0
  */
 public class QueryMapper {
@@ -422,7 +424,7 @@ public class QueryMapper {
 	@Nullable
 	private Object convertValue(Comparator comparator, @Nullable Object value, TypeInformation<?> typeHint) {
 
-		if ((Comparator.IN.equals(comparator) || Comparator.NOT_IN.equals(comparator))
+		if ((Comparators.IN.equals(comparator) || Comparators.NOT_IN.equals(comparator))
 				&& value instanceof Collection<?> collection && !collection.isEmpty()) {
 
 			Collection<Object> mapped = new ArrayList<>(collection.size());
@@ -474,22 +476,22 @@ public class QueryMapper {
 	private Condition createCondition(Column column, @Nullable Object mappedValue, SQLType sqlType,
 			MapSqlParameterSource parameterSource, Comparator comparator, boolean ignoreCase) {
 
-		if (comparator.equals(Comparator.IS_NULL)) {
+		if (comparator.equals(Comparators.IS_NULL)) {
 			return column.isNull();
 		}
 
-		if (comparator.equals(Comparator.IS_NOT_NULL)) {
+		if (comparator.equals(Comparators.IS_NOT_NULL)) {
 			return column.isNotNull();
 		}
 
-		if (comparator == Comparator.IS_TRUE) {
+		if (comparator == Comparators.IS_TRUE) {
 
 			Expression bind = bindBoolean(column, parameterSource,
 					mappedValue instanceof Boolean ? (Boolean) mappedValue : true);
 			return column.isEqualTo(bind);
 		}
 
-		if (comparator == Comparator.IS_FALSE) {
+		if (comparator == Comparators.IS_FALSE) {
 
 			Expression bind = bindBoolean(column, parameterSource,
 					mappedValue instanceof Boolean ? (Boolean) mappedValue : false);
@@ -501,7 +503,7 @@ public class QueryMapper {
 			columnExpression = Functions.upper(column);
 		}
 
-		if (comparator == Comparator.NOT_IN || comparator == Comparator.IN) {
+		if (comparator == Comparators.NOT_IN || comparator == Comparators.IN) {
 
 			Condition condition;
 
@@ -524,61 +526,67 @@ public class QueryMapper {
 				condition = Conditions.in(columnExpression, expression);
 			}
 
-			if (comparator == Comparator.NOT_IN) {
+			if (comparator == Comparators.NOT_IN) {
 				condition = condition.not();
 			}
 
 			return condition;
 		}
 
-		if (comparator == Comparator.BETWEEN || comparator == Comparator.NOT_BETWEEN) {
+		if (comparator == Comparators.BETWEEN || comparator == Comparators.NOT_BETWEEN) {
 
 			Pair<Object, Object> pair = (Pair<Object, Object>) mappedValue;
 
 			Expression begin = bind(pair.getFirst(), sqlType, parameterSource, column.getName().getReference(), ignoreCase);
 			Expression end = bind(pair.getSecond(), sqlType, parameterSource, column.getName().getReference(), ignoreCase);
 
-			return comparator == Comparator.BETWEEN ? Conditions.between(columnExpression, begin, end)
+			return comparator == Comparators.BETWEEN ? Conditions.between(columnExpression, begin, end)
 					: Conditions.notBetween(columnExpression, begin, end);
 		}
 
 		String refName = column.getName().getReference();
 
-		switch (comparator) {
-			case EQ -> {
-				Expression expression = bind(mappedValue, sqlType, parameterSource, refName, ignoreCase);
-				return Conditions.isEqual(columnExpression, expression);
-			}
-			case NEQ -> {
-				Expression expression = bind(mappedValue, sqlType, parameterSource, refName, ignoreCase);
-				return Conditions.isEqual(columnExpression, expression).not();
-			}
-			case LT -> {
-				Expression expression = bind(mappedValue, sqlType, parameterSource, refName);
-				return column.isLess(expression);
-			}
-			case LTE -> {
-				Expression expression = bind(mappedValue, sqlType, parameterSource, refName);
-				return column.isLessOrEqualTo(expression);
-			}
-			case GT -> {
-				Expression expression = bind(mappedValue, sqlType, parameterSource, refName);
-				return column.isGreater(expression);
-			}
-			case GTE -> {
-				Expression expression = bind(mappedValue, sqlType, parameterSource, refName);
-				return column.isGreaterOrEqualTo(expression);
-			}
-			case LIKE -> {
-				Expression expression = bind(mappedValue, sqlType, parameterSource, refName, ignoreCase);
-				return Conditions.like(columnExpression, expression);
-			}
-			case NOT_LIKE -> {
-				Expression expression = bind(mappedValue, sqlType, parameterSource, refName, ignoreCase);
-				return Conditions.notLike(columnExpression, expression);
-			}
-			default -> throw new UnsupportedOperationException("Comparator " + comparator + " not supported");
-		}
+        if (Comparators.EQUALS.equals(comparator)) {
+            Expression expression = bind(mappedValue, sqlType, parameterSource, refName, ignoreCase);
+            return Conditions.isEqual(columnExpression, expression);
+        }
+
+        if (Comparators.NOT_EQUALS.equals(comparator)) {
+            Expression expression = bind(mappedValue, sqlType, parameterSource, refName, ignoreCase);
+            return Conditions.isEqual(columnExpression, expression).not();
+        }
+
+        if (Comparators.LESS_THAN.equals(comparator)) {
+            Expression expression = bind(mappedValue, sqlType, parameterSource, refName);
+            return column.isLess(expression);
+        }
+
+        if (Comparators.LESS_THAN_OR_EQUALS.equals(comparator)) {
+            Expression expression = bind(mappedValue, sqlType, parameterSource, refName);
+            return column.isLessOrEqualTo(expression);
+        }
+
+        if (Comparators.GREATER_THAN.equals(comparator)) {
+            Expression expression = bind(mappedValue, sqlType, parameterSource, refName);
+            return column.isGreater(expression);
+        }
+
+        if (Comparators.GREATER_THAN_OR_EQUALS.equals(comparator)) {
+            Expression expression = bind(mappedValue, sqlType, parameterSource, refName);
+            return column.isGreaterOrEqualTo(expression);
+        }
+
+        if (Comparators.LIKE.equals(comparator)) {
+            Expression expression = bind(mappedValue, sqlType, parameterSource, refName, ignoreCase);
+            return Conditions.like(columnExpression, expression);
+        }
+
+        if (Comparators.NOT_LIKE.equals(comparator)) {
+            Expression expression = bind(mappedValue, sqlType, parameterSource, refName, ignoreCase);
+            return Conditions.notLike(columnExpression, expression);
+        }
+
+        throw new UnsupportedOperationException("Comparator " + comparator + " not supported");
 	}
 
 	private Expression bindBoolean(Column column, MapSqlParameterSource parameterSource, boolean value) {

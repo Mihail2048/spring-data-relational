@@ -28,6 +28,7 @@ import org.springframework.util.Assert;
  *
  * @author Mark Paluch
  * @author Jens Schauder
+ * @author Mikhail Polivakha
  * @since 2.0
  */
 public interface CriteriaDefinition {
@@ -92,10 +93,10 @@ public interface CriteriaDefinition {
 	SqlIdentifier getColumn();
 
 	/**
-	 * @return {@link Criteria.Comparator}.
+	 * @return {@link Comparator}.
 	 */
 	@Nullable
-	Comparator getComparator();
+    Comparator getComparator();
 
 	/**
 	 * @return the comparison value. Can be {@literal null}.
@@ -135,21 +136,5 @@ public interface CriteriaDefinition {
 
 	enum Combinator {
 		INITIAL, AND, OR;
-	}
-
-	enum Comparator {
-		INITIAL(""), EQ("="), NEQ("!="), BETWEEN("BETWEEN"), NOT_BETWEEN("NOT BETWEEN"), LT("<"), LTE("<="), GT(">"), GTE(
-				">="), IS_NULL("IS NULL"), IS_NOT_NULL("IS NOT NULL"), LIKE(
-						"LIKE"), NOT_LIKE("NOT LIKE"), NOT_IN("NOT IN"), IN("IN"), IS_TRUE("IS TRUE"), IS_FALSE("IS FALSE");
-
-		private final String comparator;
-
-		Comparator(String comparator) {
-			this.comparator = comparator;
-		}
-
-		public String getComparator() {
-			return comparator;
-		}
 	}
 }

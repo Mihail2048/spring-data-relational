@@ -15,6 +15,15 @@
  */
 package org.springframework.data.relational.core.query;
 
+import static org.springframework.data.relational.core.query.Comparators.BETWEEN;
+import static org.springframework.data.relational.core.query.Comparators.IN;
+import static org.springframework.data.relational.core.query.Comparators.IS_FALSE;
+import static org.springframework.data.relational.core.query.Comparators.IS_NOT_NULL;
+import static org.springframework.data.relational.core.query.Comparators.IS_NULL;
+import static org.springframework.data.relational.core.query.Comparators.IS_TRUE;
+import static org.springframework.data.relational.core.query.Comparators.NOT_BETWEEN;
+import static org.springframework.data.relational.core.query.Comparators.NOT_IN;
+
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -53,11 +62,12 @@ import org.springframework.util.Assert;
  * @author Oliver Drotbohm
  * @author Roman Chigvintsev
  * @author Jens Schauder
+ * @author Mikhail Polivakha
  * @since 2.0
  */
 public class Criteria implements CriteriaDefinition {
 
-	static final Criteria EMPTY = new Criteria(SqlIdentifier.EMPTY, Comparator.INITIAL, null);
+	static final Criteria EMPTY = new Criteria(SqlIdentifier.EMPTY, Comparators.INITIAL, null);
 
 	private final @Nullable Criteria previous;
 	private final Combinator combinator;
@@ -307,7 +317,7 @@ public class Criteria implements CriteriaDefinition {
 
 	private boolean doIsEmpty() {
 
-		if (this.comparator == Comparator.INITIAL) {
+		if (this.comparator == Comparators.INITIAL) {
 			return true;
 		}
 
@@ -476,30 +486,24 @@ public class Criteria implements CriteriaDefinition {
 			return;
 		}
 
-		stringBuilder.append(criteria.getColumn().toSql(IdentifierProcessing.NONE)).append(' ')
-				.append(criteria.getComparator().getComparator());
+        Comparator comparator = criteria.getComparator();
 
-		switch (criteria.getComparator()) {
-			case BETWEEN:
-			case NOT_BETWEEN:
-				Pair<Object, Object> pair = (Pair<Object, Object>) criteria.getValue();
-				stringBuilder.append(' ').append(pair.getFirst()).append(" AND ").append(pair.getSecond());
-				break;
+        stringBuilder.append(criteria.getColumn().toSql(IdentifierProcessing.NONE)).append(' ')
+				.append(comparator.getComparator());
 
-			case IS_NULL:
-			case IS_NOT_NULL:
-			case IS_TRUE:
-			case IS_FALSE:
-				break;
-
-			case IN:
-			case NOT_IN:
-				stringBuilder.append(" (").append(renderValue(criteria.getValue())).append(')');
-				break;
-
-			default:
-				stringBuilder.append(' ').append(renderValue(criteria.getValue()));
-		}
+        if (BETWEEN.equals(comparator) || NOT_BETWEEN.equals(comparator)) {
+            Pair<Object, Object> pair = (Pair<Object, Object>) criteria.getValue();
+            stringBuilder.append(' ')
+              .append(pair.getFirst())
+              .append(" AND ")
+              .append(pair.getSecond());
+        } else if (IS_NULL.equals(comparator) || IS_NOT_NULL.equals(comparator) || IS_TRUE.equals(comparator) || IS_FALSE.equals(comparator) || comparator instanceof CustomComparator) {
+            // No-Op
+        } else if (IN.equals(comparator) || NOT_IN.equals(comparator)) {
+            stringBuilder.append(" (").append(renderValue(criteria.getValue())).append(')');
+        } else {
+            stringBuilder.append(' ').append(renderValue(criteria.getValue()));
+        }
 	}
 
 	private static String renderValue(@Nullable Object value) {
@@ -653,6 +657,30 @@ public class Criteria implements CriteriaDefinition {
 		 * @return a new {@link Criteria} object
 		 */
 		Criteria isFalse();
+
+		/**
+		 * Creates a {@link Criteria} using a custom comparator. Please, note, that the
+         * string returned from the passed {@link CustomComparator} will be directly embedded
+         * into the SQL condition.
+         * <p>
+         * An example of such custom comparator could be:
+         * <p>
+         * <pre class="code">
+         * Criteria
+         *     .where("name").is("MyName")
+         *     .and("points").custom(() -> "@> ARRAY['value']::text[]")
+         * </pre>
+         *
+         * The {@link Criteria} above would be rendered to the following SQL condition:
+         * <p>
+         * <pre class="code">
+         *     name = 'MyName' AND points @> ARRAY['value']::text[]
+         * </pre>
+         *
+		 * @return a new {@link Criteria} object
+         * @see CustomComparator
+		 */
+		Criteria custom(CustomComparator comparator);
 	}
 
 	/**
@@ -671,7 +699,7 @@ public class Criteria implements CriteriaDefinition {
 
 			Assert.notNull(value, "Value must not be null");
 
-			return createCriteria(Comparator.EQ, value);
+			return createCriteria(Comparators.EQUALS, value);
 		}
 
 		@Override
@@ -679,7 +707,7 @@ public class Criteria implements CriteriaDefinition {
 
 			Assert.notNull(value, "Value must not be null");
 
-			return createCriteria(Comparator.NEQ, value);
+			return createCriteria(Comparators.NOT_EQUALS, value);
 		}
 
 		@Override
@@ -693,7 +721,7 @@ public class Criteria implements CriteriaDefinition {
 						"You can only pass in one argument of type " + values[1].getClass().getName());
 			}
 
-			return createCriteria(Comparator.IN, Arrays.asList(values));
+			return createCriteria(IN, Arrays.asList(values));
 		}
 
 		@Override
@@ -702,7 +730,7 @@ public class Criteria implements CriteriaDefinition {
 			Assert.notNull(values, "Values must not be null");
 			Assert.noNullElements(values.toArray(), "Values must not contain a null value");
 
-			return createCriteria(Comparator.IN, values);
+			return createCriteria(IN, values);
 		}
 
 		@Override
@@ -716,7 +744,7 @@ public class Criteria implements CriteriaDefinition {
 						"You can only pass in one argument of type " + values[1].getClass().getName());
 			}
 
-			return createCriteria(Comparator.NOT_IN, Arrays.asList(values));
+			return createCriteria(NOT_IN, Arrays.asList(values));
 		}
 
 		@Override
@@ -725,7 +753,7 @@ public class Criteria implements CriteriaDefinition {
 			Assert.notNull(values, "Values must not be null");
 			Assert.noNullElements(values.toArray(), "Values must not contain a null value");
 
-			return createCriteria(Comparator.NOT_IN, values);
+			return createCriteria(NOT_IN, values);
 		}
 
 		@Override
@@ -734,7 +762,7 @@ public class Criteria implements CriteriaDefinition {
 			Assert.notNull(begin, "Begin value must not be null");
 			Assert.notNull(end, "End value must not be null");
 
-			return createCriteria(Comparator.BETWEEN, Pair.of(begin, end));
+			return createCriteria(BETWEEN, Pair.of(begin, end));
 		}
 
 		@Override
@@ -743,7 +771,7 @@ public class Criteria implements CriteriaDefinition {
 			Assert.notNull(begin, "Begin value must not be null");
 			Assert.notNull(end, "End value must not be null");
 
-			return createCriteria(Comparator.NOT_BETWEEN, Pair.of(begin, end));
+			return createCriteria(NOT_BETWEEN, Pair.of(begin, end));
 		}
 
 		@Override
@@ -751,7 +779,7 @@ public class Criteria implements CriteriaDefinition {
 
 			Assert.notNull(value, "Value must not be null");
 
-			return createCriteria(Comparator.LT, value);
+			return createCriteria(Comparators.LESS_THAN, value);
 		}
 
 		@Override
@@ -759,7 +787,7 @@ public class Criteria implements CriteriaDefinition {
 
 			Assert.notNull(value, "Value must not be null");
 
-			return createCriteria(Comparator.LTE, value);
+			return createCriteria(Comparators.LESS_THAN_OR_EQUALS, value);
 		}
 
 		@Override
@@ -767,7 +795,7 @@ public class Criteria implements CriteriaDefinition {
 
 			Assert.notNull(value, "Value must not be null");
 
-			return createCriteria(Comparator.GT, value);
+			return createCriteria(Comparators.GREATER_THAN, value);
 		}
 
 		@Override
@@ -775,7 +803,7 @@ public class Criteria implements CriteriaDefinition {
 
 			Assert.notNull(value, "Value must not be null");
 
-			return createCriteria(Comparator.GTE, value);
+			return createCriteria(Comparators.GREATER_THAN_OR_EQUALS, value);
 		}
 
 		@Override
@@ -783,36 +811,41 @@ public class Criteria implements CriteriaDefinition {
 
 			Assert.notNull(value, "Value must not be null");
 
-			return createCriteria(Comparator.LIKE, value);
+			return createCriteria(Comparators.LIKE, value);
 		}
 
 		@Override
 		public Criteria notLike(Object value) {
 			Assert.notNull(value, "Value must not be null");
-			return createCriteria(Comparator.NOT_LIKE, value);
+			return createCriteria(Comparators.NOT_LIKE, value);
 		}
 
 		@Override
 		public Criteria isNull() {
-			return createCriteria(Comparator.IS_NULL, null);
+			return createCriteria(IS_NULL, null);
 		}
 
 		@Override
 		public Criteria isNotNull() {
-			return createCriteria(Comparator.IS_NOT_NULL, null);
+			return createCriteria(IS_NOT_NULL, null);
 		}
 
 		@Override
 		public Criteria isTrue() {
-			return createCriteria(Comparator.IS_TRUE, true);
+			return createCriteria(IS_TRUE, true);
 		}
 
 		@Override
 		public Criteria isFalse() {
-			return createCriteria(Comparator.IS_FALSE, false);
+			return createCriteria(IS_FALSE, false);
 		}
 
-		protected Criteria createCriteria(Comparator comparator, @Nullable Object value) {
+        @Override
+        public Criteria custom(CustomComparator comparator) {
+            return createCriteria(comparator, null);
+        }
+
+        protected Criteria createCriteria(Comparator comparator, @Nullable Object value) {
 			return new Criteria(this.property, comparator, value);
 		}
 	}

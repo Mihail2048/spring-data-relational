@@ -23,6 +23,7 @@ import java.util.Arrays;
 import org.assertj.core.api.SoftAssertions;
 import org.junit.jupiter.api.Test;
 
+import org.springframework.data.relational.core.query.Comparators;
 import org.springframework.data.relational.core.query.Criteria;
 import org.springframework.data.relational.core.sql.SqlIdentifier;
 
@@ -31,6 +32,7 @@ import org.springframework.data.relational.core.sql.SqlIdentifier;
  *
  * @author Mark Paluch
  * @author Mingyuan Wu
+ * @author Mikhail Polivakha
  */
 class CriteriaUnitTests {
 
@@ -83,7 +85,7 @@ class CriteriaUnitTests {
 		Criteria criteria = where("foo").is("bar").and("baz").isNotNull();
 
 		assertThat(criteria.getColumn()).isEqualTo(SqlIdentifier.unquoted("baz"));
-		assertThat(criteria.getComparator()).isEqualTo(Comparator.IS_NOT_NULL);
+		assertThat(criteria.getComparator()).isEqualTo(Comparators.IS_NOT_NULL);
 		assertThat(criteria.getValue()).isNull();
 		assertThat(criteria.getPrevious()).isNotNull();
 		assertThat(criteria.getCombinator()).isEqualTo(Combinator.AND);
@@ -91,7 +93,7 @@ class CriteriaUnitTests {
 		criteria = criteria.getPrevious();
 
 		assertThat(criteria.getColumn()).isEqualTo(SqlIdentifier.unquoted("foo"));
-		assertThat(criteria.getComparator()).isEqualTo(Comparator.EQ);
+		assertThat(criteria.getComparator()).isEqualTo(Comparators.EQUALS);
 		assertThat(criteria.getValue()).isEqualTo("bar");
 	}
 
@@ -109,7 +111,7 @@ class CriteriaUnitTests {
 
 		assertThat(criteria).isNotNull();
 		assertThat(criteria.getColumn()).isEqualTo(SqlIdentifier.unquoted("foo"));
-		assertThat(criteria.getComparator()).isEqualTo(Comparator.EQ);
+		assertThat(criteria.getComparator()).isEqualTo(Comparators.EQUALS);
 		assertThat(criteria.getValue()).isEqualTo("bar");
 	}
 
@@ -142,7 +144,7 @@ class CriteriaUnitTests {
 
 		assertThat(criteria).isNotNull();
 		assertThat(criteria.getColumn()).isEqualTo(SqlIdentifier.unquoted("foo"));
-		assertThat(criteria.getComparator()).isEqualTo(Comparator.EQ);
+		assertThat(criteria.getComparator()).isEqualTo(Comparators.EQUALS);
 		assertThat(criteria.getValue()).isEqualTo("bar");
 	}
 
@@ -152,7 +154,7 @@ class CriteriaUnitTests {
 		Criteria criteria = where("foo").is("bar");
 
 		assertThat(criteria.getColumn()).isEqualTo(SqlIdentifier.unquoted("foo"));
-		assertThat(criteria.getComparator()).isEqualTo(Comparator.EQ);
+		assertThat(criteria.getComparator()).isEqualTo(Comparators.EQUALS);
 		assertThat(criteria.getValue()).isEqualTo("bar");
 	}
 
@@ -161,7 +163,7 @@ class CriteriaUnitTests {
 		Criteria criteria = where("foo").is("bar").ignoreCase(true);
 
 		assertThat(criteria.getColumn()).isEqualTo(SqlIdentifier.unquoted("foo"));
-		assertThat(criteria.getComparator()).isEqualTo(Comparator.EQ);
+		assertThat(criteria.getComparator()).isEqualTo(Comparators.EQUALS);
 		assertThat(criteria.getValue()).isEqualTo("bar");
 		assertThat(criteria.isIgnoreCase()).isTrue();
 	}
@@ -172,7 +174,7 @@ class CriteriaUnitTests {
 		Criteria criteria = where("foo").not("bar");
 
 		assertThat(criteria.getColumn()).isEqualTo(SqlIdentifier.unquoted("foo"));
-		assertThat(criteria.getComparator()).isEqualTo(Comparator.NEQ);
+		assertThat(criteria.getComparator()).isEqualTo(Comparators.NOT_EQUALS);
 		assertThat(criteria.getValue()).isEqualTo("bar");
 	}
 
@@ -182,7 +184,7 @@ class CriteriaUnitTests {
 		Criteria criteria = where("foo").in("bar", "baz");
 
 		assertThat(criteria.getColumn()).isEqualTo(SqlIdentifier.unquoted("foo"));
-		assertThat(criteria.getComparator()).isEqualTo(Comparator.IN);
+		assertThat(criteria.getComparator()).isEqualTo(Comparators.IN);
 		assertThat(criteria.getValue()).isEqualTo(Arrays.asList("bar", "baz"));
 	}
 
@@ -192,7 +194,7 @@ class CriteriaUnitTests {
 		Criteria criteria = where("foo").notIn("bar", "baz");
 
 		assertThat(criteria.getColumn()).isEqualTo(SqlIdentifier.unquoted("foo"));
-		assertThat(criteria.getComparator()).isEqualTo(Comparator.NOT_IN);
+		assertThat(criteria.getComparator()).isEqualTo(Comparators.NOT_IN);
 		assertThat(criteria.getValue()).isEqualTo(Arrays.asList("bar", "baz"));
 	}
 
@@ -202,7 +204,7 @@ class CriteriaUnitTests {
 		Criteria criteria = where("foo").greaterThan(1);
 
 		assertThat(criteria.getColumn()).isEqualTo(SqlIdentifier.unquoted("foo"));
-		assertThat(criteria.getComparator()).isEqualTo(Comparator.GT);
+		assertThat(criteria.getComparator()).isEqualTo(Comparators.GREATER_THAN);
 		assertThat(criteria.getValue()).isEqualTo(1);
 	}
 
@@ -212,7 +214,7 @@ class CriteriaUnitTests {
 		Criteria criteria = where("foo").greaterThanOrEquals(1);
 
 		assertThat(criteria.getColumn()).isEqualTo(SqlIdentifier.unquoted("foo"));
-		assertThat(criteria.getComparator()).isEqualTo(Comparator.GTE);
+		assertThat(criteria.getComparator()).isEqualTo(Comparators.GREATER_THAN_OR_EQUALS);
 		assertThat(criteria.getValue()).isEqualTo(1);
 	}
 
@@ -222,7 +224,7 @@ class CriteriaUnitTests {
 		Criteria criteria = where("foo").lessThan(1);
 
 		assertThat(criteria.getColumn()).isEqualTo(SqlIdentifier.unquoted("foo"));
-		assertThat(criteria.getComparator()).isEqualTo(Comparator.LT);
+		assertThat(criteria.getComparator()).isEqualTo(Comparators.LESS_THAN);
 		assertThat(criteria.getValue()).isEqualTo(1);
 	}
 
@@ -232,7 +234,7 @@ class CriteriaUnitTests {
 		Criteria criteria = where("foo").lessThanOrEquals(1);
 
 		assertThat(criteria.getColumn()).isEqualTo(SqlIdentifier.unquoted("foo"));
-		assertThat(criteria.getComparator()).isEqualTo(Comparator.LTE);
+		assertThat(criteria.getComparator()).isEqualTo(Comparators.LESS_THAN_OR_EQUALS);
 		assertThat(criteria.getValue()).isEqualTo(1);
 	}
 
@@ -242,7 +244,7 @@ class CriteriaUnitTests {
 		Criteria criteria = where("foo").like("hello%");
 
 		assertThat(criteria.getColumn()).isEqualTo(SqlIdentifier.unquoted("foo"));
-		assertThat(criteria.getComparator()).isEqualTo(Comparator.LIKE);
+		assertThat(criteria.getComparator()).isEqualTo(Comparators.LIKE);
 		assertThat(criteria.getValue()).isEqualTo("hello%");
 	}
 
@@ -251,7 +253,7 @@ class CriteriaUnitTests {
 		Criteria criteria = where("foo").notLike("hello%");
 
 		assertThat(criteria.getColumn()).isEqualTo(SqlIdentifier.unquoted("foo"));
-		assertThat(criteria.getComparator()).isEqualTo(Comparator.NOT_LIKE);
+		assertThat(criteria.getComparator()).isEqualTo(Comparators.NOT_LIKE);
 		assertThat(criteria.getValue()).isEqualTo("hello%");
 	}
 
@@ -261,7 +263,7 @@ class CriteriaUnitTests {
 		Criteria criteria = where("foo").isNull();
 
 		assertThat(criteria.getColumn()).isEqualTo(SqlIdentifier.unquoted("foo"));
-		assertThat(criteria.getComparator()).isEqualTo(Comparator.IS_NULL);
+		assertThat(criteria.getComparator()).isEqualTo(Comparators.IS_NULL);
 	}
 
 	@Test // gh-64
@@ -270,7 +272,7 @@ class CriteriaUnitTests {
 		Criteria criteria = where("foo").isNotNull();
 
 		assertThat(criteria.getColumn()).isEqualTo(SqlIdentifier.unquoted("foo"));
-		assertThat(criteria.getComparator()).isEqualTo(Comparator.IS_NOT_NULL);
+		assertThat(criteria.getComparator()).isEqualTo(Comparators.IS_NOT_NULL);
 	}
 
 	@Test // gh-282
@@ -279,7 +281,7 @@ class CriteriaUnitTests {
 		Criteria criteria = where("foo").isTrue();
 
 		assertThat(criteria.getColumn()).isEqualTo(SqlIdentifier.unquoted("foo"));
-		assertThat(criteria.getComparator()).isEqualTo(Comparator.IS_TRUE);
+		assertThat(criteria.getComparator()).isEqualTo(Comparators.IS_TRUE);
 	}
 
 	@Test // gh-282
@@ -288,6 +290,6 @@ class CriteriaUnitTests {
 		Criteria criteria = where("foo").isFalse();
 
 		assertThat(criteria.getColumn()).isEqualTo(SqlIdentifier.unquoted("foo"));
-		assertThat(criteria.getComparator()).isEqualTo(Comparator.IS_FALSE);
+		assertThat(criteria.getComparator()).isEqualTo(Comparators.IS_FALSE);
 	}
 }

@@ -33,9 +33,10 @@ import org.springframework.data.r2dbc.dialect.R2dbcDialect;
 import org.springframework.data.relational.core.dialect.Escaper;
 import org.springframework.data.relational.core.mapping.RelationalPersistentEntity;
 import org.springframework.data.relational.core.mapping.RelationalPersistentProperty;
+import org.springframework.data.relational.core.query.Comparator;
 import org.springframework.data.relational.core.query.CriteriaDefinition;
-import org.springframework.data.relational.core.query.CriteriaDefinition.Comparator;
 import org.springframework.data.relational.core.query.ValueFunction;
+import org.springframework.data.relational.core.query.Comparators;
 import org.springframework.data.relational.core.sql.*;
 import org.springframework.data.relational.domain.SqlSort;
 import org.springframework.data.util.Pair;
@@ -58,6 +59,7 @@ import org.springframework.util.ClassUtils;
  * @author Manousos Mathioudakis
  * @author Jens Schauder
  * @author Yan Qiang
+ * @author Mikhail Polivakha
  */
 public class QueryMapper {
 
@@ -325,7 +327,7 @@ public class QueryMapper {
 
 	private Escaper getEscaper(Comparator comparator) {
 
-		if (comparator == Comparator.LIKE || comparator == Comparator.NOT_LIKE) {
+		if (comparator == Comparators.LIKE || comparator == Comparators.NOT_LIKE) {
 			return dialect.getLikeEscaper();
 		}
 
@@ -351,7 +353,7 @@ public class QueryMapper {
 	@Nullable
 	private Object convertValue(Comparator comparator, @Nullable Object value, TypeInformation<?> typeHint) {
 
-		if ((Comparator.IN.equals(comparator) || Comparator.NOT_IN.equals(comparator))
+		if ((Comparators.IN.equals(comparator) || Comparators.NOT_IN.equals(comparator))
 				&& value instanceof Collection<?> collection && !collection.isEmpty()) {
 
 			Collection<Object> mapped = new ArrayList<>(collection.size());
@@ -396,21 +398,21 @@ public class QueryMapper {
 	private Condition createCondition(Column column, @Nullable Object mappedValue, Class<?> valueType,
 			MutableBindings bindings, Comparator comparator, boolean ignoreCase) {
 
-		if (comparator.equals(Comparator.IS_NULL)) {
+		if (comparator.equals(Comparators.IS_NULL)) {
 			return column.isNull();
 		}
 
-		if (comparator.equals(Comparator.IS_NOT_NULL)) {
+		if (comparator.equals(Comparators.IS_NOT_NULL)) {
 			return column.isNotNull();
 		}
 
-		if (comparator == Comparator.IS_TRUE) {
+		if (comparator == Comparators.IS_TRUE) {
 			Expression bind = booleanBind(column, mappedValue, valueType, bindings, ignoreCase);
 
 			return column.isEqualTo(bind);
 		}
 
-		if (comparator == Comparator.IS_FALSE) {
+		if (comparator == Comparators.IS_FALSE) {
 			Expression bind = booleanBind(column, mappedValue, valueType, bindings, ignoreCase);
 
 			return column.isEqualTo(bind);
@@ -421,7 +423,7 @@ public class QueryMapper {
 			columnExpression = Functions.upper(column);
 		}
 
-		if (comparator == Comparator.NOT_IN || comparator == Comparator.IN) {
+		if (comparator == Comparators.NOT_IN || comparator == Comparators.IN) {
 
 			Condition condition;
 
@@ -446,14 +448,14 @@ public class QueryMapper {
 				condition = Conditions.in(columnExpression, expression);
 			}
 
-			if (comparator == Comparator.NOT_IN) {
+			if (comparator == Comparators.NOT_IN) {
 				condition = condition.not();
 			}
 
 			return condition;
 		}
 
-		if (comparator == Comparator.BETWEEN || comparator == Comparator.NOT_BETWEEN) {
+		if (comparator == Comparators.BETWEEN || comparator == Comparators.NOT_BETWEEN) {
 
 			Pair<Object, Object> pair = (Pair<Object, Object>) mappedValue;
 
@@ -462,49 +464,46 @@ public class QueryMapper {
 			Expression end = bind(pair.getSecond(), valueType, bindings, bindings.nextMarker(column.getName().getReference()),
 					ignoreCase);
 
-			return comparator == Comparator.BETWEEN ? Conditions.between(columnExpression, begin, end)
+			return comparator == Comparators.BETWEEN ? Conditions.between(columnExpression, begin, end)
 					: Conditions.notBetween(columnExpression, begin, end);
 		}
 
 		BindMarker bindMarker = bindings.nextMarker(column.getName().getReference());
 
-		switch (comparator) {
-			case EQ: {
-				Expression expression = bind(mappedValue, valueType, bindings, bindMarker, ignoreCase);
-				return Conditions.isEqual(columnExpression, expression);
-			}
-			case NEQ: {
-				Expression expression = bind(mappedValue, valueType, bindings, bindMarker, ignoreCase);
-				return Conditions.isEqual(columnExpression, expression).not();
-			}
-			case LT: {
-				Expression expression = bind(mappedValue, valueType, bindings, bindMarker);
-				return column.isLess(expression);
-			}
-			case LTE: {
-				Expression expression = bind(mappedValue, valueType, bindings, bindMarker);
-				return column.isLessOrEqualTo(expression);
-			}
-			case GT: {
-				Expression expression = bind(mappedValue, valueType, bindings, bindMarker);
-				return column.isGreater(expression);
-			}
-			case GTE: {
-				Expression expression = bind(mappedValue, valueType, bindings, bindMarker);
-				return column.isGreaterOrEqualTo(expression);
-			}
-			case LIKE: {
-				Expression expression = bind(mappedValue, valueType, bindings, bindMarker, ignoreCase);
-				return Conditions.like(columnExpression, expression);
-			}
-			case NOT_LIKE: {
-				Expression expression = bind(mappedValue, valueType, bindings, bindMarker, ignoreCase);
-				return Conditions.notLike(columnExpression, expression);
-			}
-			default:
-				throw new UnsupportedOperationException("Comparator " + comparator + " not supported");
-		}
-	}
+        if (Comparators.EQUALS.equals(comparator)) {
+            Expression expression = bind(mappedValue, valueType, bindings, bindMarker, ignoreCase);
+            return Conditions.isEqual(columnExpression, expression);
+
+        } else if (Comparators.NOT_EQUALS.equals(comparator)) {
+            Expression expression = bind(mappedValue, valueType, bindings, bindMarker, ignoreCase);
+            return Conditions.isEqual(columnExpression, expression).not();
+
+        } else if (Comparators.LESS_THAN.equals(comparator)) {
+            Expression expression = bind(mappedValue, valueType, bindings, bindMarker);
+            return column.isLess(expression);
+
+        } else if (Comparators.LESS_THAN_OR_EQUALS.equals(comparator)) {
+            Expression expression = bind(mappedValue, valueType, bindings, bindMarker);
+            return column.isLessOrEqualTo(expression);
+
+        } else if (Comparators.GREATER_THAN.equals(comparator)) {
+            Expression expression = bind(mappedValue, valueType, bindings, bindMarker);
+            return column.isGreater(expression);
+
+        } else if (Comparators.GREATER_THAN_OR_EQUALS.equals(comparator)) {
+            Expression expression = bind(mappedValue, valueType, bindings, bindMarker);
+            return column.isGreaterOrEqualTo(expression);
+
+        } else if (Comparators.LIKE.equals(comparator)) {
+            Expression expression = bind(mappedValue, valueType, bindings, bindMarker, ignoreCase);
+            return Conditions.like(columnExpression, expression);
+
+        } else if (Comparators.NOT_LIKE.equals(comparator)) {
+            Expression expression = bind(mappedValue, valueType, bindings, bindMarker, ignoreCase);
+            return Conditions.notLike(columnExpression, expression);
+        }
+        throw new UnsupportedOperationException("Comparator " + comparator + " not supported");
+    }
 
 	Field createPropertyField(@Nullable RelationalPersistentEntity<?> entity, SqlIdentifier key) {
 		return entity == null ? new Field(key) : new MetadataBackedField(key, entity, mappingContext);
